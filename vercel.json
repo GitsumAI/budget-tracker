@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "api/scan-receipt.js": {
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
+}
