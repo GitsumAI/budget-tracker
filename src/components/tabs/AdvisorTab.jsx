@@ -83,7 +83,7 @@ export default function AdvisorTab() {
   const [messages, setMessages]   = useState([])
   const [input, setInput]         = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [copyState, setCopyState] = useState('idle') // idle | copied
+  const [syncState, setSyncState] = useState('idle') // idle | syncing | done | error
   const bottomRef  = useRef(null)
   const inputRef   = useRef(null)
 
@@ -167,22 +167,33 @@ export default function AdvisorTab() {
     }
   }
 
-  async function handleSyncToProject() {
-    const text = generateProjectSyncText(transactions, budgets)
+  async function handleSyncToGitHub() {
+    if (syncState === 'syncing') return
+    setSyncState('syncing')
+    const content = generateProjectSyncText(transactions, budgets)
     try {
-      await navigator.clipboard.writeText(text)
-      setCopyState('copied')
-      setTimeout(() => setCopyState('idle'), 3000)
-    } catch {
-      // Fallback for browsers that block clipboard
-      const ta = document.createElement('textarea')
-      ta.value = text
-      document.body.appendChild(ta)
-      ta.select()
-      document.execCommand('copy')
-      document.body.removeChild(ta)
-      setCopyState('copied')
-      setTimeout(() => setCopyState('idle'), 3000)
+      const isLocalhost = window.location.hostname === 'localhost'
+      if (isLocalhost) {
+        await new Promise(r => setTimeout(r, 1000))
+        setSyncState('done')
+        setTimeout(() => setSyncState('idle'), 4000)
+        return
+      }
+      const res = await fetch('/api/sync-github', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ content }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || `Error ${res.status}`)
+      }
+      setSyncState('done')
+      setTimeout(() => setSyncState('idle'), 5000)
+    } catch (err) {
+      console.error('Sync error:', err)
+      setSyncState('error')
+      setTimeout(() => setSyncState('idle'), 4000)
     }
   }
 
@@ -213,29 +224,50 @@ export default function AdvisorTab() {
           )}
         </div>
 
-        {/* Sync to Claude Project button */}
-        <button onClick={handleSyncToProject}
-          className="w-full py-2.5 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold transition-all"
-          style={copyState === 'copied'
-            ? { background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.3)', color: '#4ADE80' }
-            : { background: 'rgba(34,211,238,0.06)', border: '1px solid rgba(34,211,238,0.2)', color: '#94A3B8' }
+        {/* Sync to GitHub button */}
+        <button onClick={handleSyncToGitHub}
+          disabled={syncState === 'syncing'}
+          className="w-full py-2.5 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold transition-all disabled:opacity-60"
+          style={
+            syncState === 'done'
+              ? { background: 'rgba(74,222,128,0.1)',  border: '1px solid rgba(74,222,128,0.3)',  color: '#4ADE80' }
+            : syncState === 'error'
+              ? { background: 'rgba(239,68,68,0.1)',   border: '1px solid rgba(239,68,68,0.3)',   color: '#F87171' }
+            : { background: 'rgba(34,211,238,0.06)',  border: '1px solid rgba(34,211,238,0.2)',  color: '#94A3B8' }
           }>
-          {copyState === 'copied' ? (
+          {syncState === 'syncing' ? (
+            <>
+              <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" strokeLinecap="round"/>
+              </svg>
+              Syncing…
+            </>
+          ) : syncState === 'done' ? (
             <>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
                 strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              Copied! Paste into your Claude Finance Project
+              Synced — agents can read your latest data
+            </>
+          ) : syncState === 'error' ? (
+            <>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              Sync failed — check Vercel env vars
             </>
           ) : (
             <>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
                 strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
-                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+                <polyline points="23 4 23 10 17 10"/>
+                <path d="M20.49 15a9 9 0 1 1-.08-4.49"/>
               </svg>
-              Sync to Claude.ai Finance Project
+              Sync Financial Data to Agents
             </>
           )}
         </button>
