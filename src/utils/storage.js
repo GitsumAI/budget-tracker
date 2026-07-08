@@ -1,10 +1,11 @@
 import { DEFAULT_BUDGETS } from '../data/categories.js'
 
 const KEYS = {
-  TRANSACTIONS: 'budget_transactions',
-  BUDGETS:      'budget_budgets',
-  SETTINGS:     'budget_settings',
-  SAMPLE_LOADED: 'budget_sample_loaded',
+  TRANSACTIONS:   'budget_transactions',
+  BUDGETS:        'budget_budgets',
+  SETTINGS:       'budget_settings',
+  SAMPLE_LOADED:  'budget_sample_loaded',
+  CONVERSATIONS:  'budget_conversations',
 }
 
 function safeGet(key, fallback) {
@@ -66,6 +67,20 @@ export function markSampleLoaded() {
 
 export function clearSampleFlag() {
   try { localStorage.removeItem(KEYS.SAMPLE_LOADED) } catch {}
+}
+
+// Conversations
+export function getConversations() {
+  return safeGet(KEYS.CONVERSATIONS, [])
+}
+
+export function saveConversations(messages) {
+  // Keep last 40 messages to avoid storage bloat
+  return safeSet(KEYS.CONVERSATIONS, messages.slice(-40))
+}
+
+export function clearConversations() {
+  try { localStorage.removeItem(KEYS.CONVERSATIONS) } catch {}
 }
 
 // Wipe everything

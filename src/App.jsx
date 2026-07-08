@@ -5,6 +5,7 @@ import AddTab from './components/tabs/AddTab.jsx'
 import DashboardTab from './components/tabs/DashboardTab.jsx'
 import HistoryTab from './components/tabs/HistoryTab.jsx'
 import BudgetTab from './components/tabs/BudgetTab.jsx'
+import AdvisorTab from './components/tabs/AdvisorTab.jsx'
 
 function AppContent() {
   const { activeTab } = useBudget()
@@ -16,6 +17,7 @@ function AppContent() {
         {activeTab === 'dashboard' && <DashboardTab key="dashboard" />}
         {activeTab === 'history'   && <HistoryTab key="history" />}
         {activeTab === 'budget'    && <BudgetTab key="budget" />}
+        {activeTab === 'advisor'   && <AdvisorTab key="advisor" />}
       </main>
       <BottomNav />
     </div>

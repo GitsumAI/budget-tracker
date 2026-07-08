@@ -1,5 +1,5 @@
 import { EXPENSE_CATEGORIES } from '../data/categories.js'
-import { formatShortMonthYear, prevMonth } from './formatters.js'
+import { formatShortMonthYear, formatMonthYear, prevMonth } from './formatters.js'
 
 export function filterByMonth(transactions, year, month) {
   const prefix = `${year}-${String(month).padStart(2, '0')}`
@@ -202,4 +202,106 @@ export function generateCSV(transactions) {
     ].join(',')
   })
   return [header, ...rows].join('\n')
+}
+
+// ─── AI Advisor context generators ────────────────────────────────────────────
+
+export function generateFinancialContext(transactions, budgets) {
+  const now  = new Date()
+  const cy   = now.getFullYear()
+  const cm   = now.getMonth() + 1
+  const c    = (n) => `$${Number(n).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
+  // Monthly summaries for last 12 months
+  const monthRows = []
+  for (let i = 11; i >= 0; i--) {
+    let y = cy, m = cm - i
+    if (m <= 0) { m += 12; y -= 1 }
+    const mt  = filterByMonth(transactions, y, m)
+    if (mt.length === 0 && i > 1) continue
+    const inc = getIncome(mt)
+    const exp = getExpenses(mt)
+    const cf  = inc - exp
+    const sr  = getSavingsRate(inc, exp)
+    monthRows.push(`${formatShortMonthYear(y, m).padEnd(10)} | ${c(inc).padEnd(11)} | ${c(exp).padEnd(11)} | ${c(cf).padEnd(11)} | ${(sr*100).toFixed(1)}%`)
+  }
+
+  // Budget vs actual this month
+  const bva = getBudgetVsActual(transactions, budgets, cy, cm)
+  const bvaRows = bva.map(r => {
+    const over = r.variance > 0 ? ` ⚠️ OVER ${c(r.variance)}` : r.variance < 0 ? ` ✅ under ${c(Math.abs(r.variance))}` : ' ✅ on budget'
+    return `${r.category.padEnd(24)} | ${c(r.budget).padEnd(10)} | ${c(r.actual).padEnd(10)} |${over}`
+  })
+
+  // Spending by tag and payment method
+  const tagTotals = {}, pmTotals = {}
+  transactions.filter(t => t.type === 'Expense').forEach(t => {
+    if (t.tag) tagTotals[t.tag] = (tagTotals[t.tag] || 0) + t.amount
+    if (t.paymentMethod) pmTotals[t.paymentMethod] = (pmTotals[t.paymentMethod] || 0) + t.amount
+  })
+
+  // Recent 30 transactions
+  const recent = [...transactions]
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 30)
+    .map(t => {
+      const [,mo,d] = t.date.split('-').map(Number)
+      const desc = (t.description || t.subcategory || '').substring(0, 20)
+      return `${SHORT[mo-1]} ${String(d).padStart(2)} | ${t.category.padEnd(18)} | ${desc.padEnd(20)} | ${t.type === 'Expense' ? '-' : '+'}${c(t.amount)}`
+    })
+
+  const totalInc = getIncome(transactions)
+  const totalExp = getExpenses(transactions)
+
+  let ctx = `=== USER PROFILE ===\n`
+  ctx += `Location: Victoria, British Columbia, Canada\n`
+  ctx += `Currency: CAD | Savings Goal: 20% | Total transactions on file: ${transactions.length}\n\n`
+
+  ctx += `=== MONTHLY PERFORMANCE ===\n`
+  ctx += `Month      | Income      | Expenses    | Cash Flow   | Savings%\n`
+  ctx += `${'-'.repeat(65)}\n`
+  ctx += monthRows.join('\n') + '\n\n'
+
+  ctx += `=== THIS MONTH — BUDGET VS ACTUAL (${formatShortMonthYear(cy, cm)}) ===\n`
+  ctx += `Category                 | Budget     | Actual     | Status\n`
+  ctx += `${'-'.repeat(70)}\n`
+  ctx += bvaRows.join('\n') + '\n\n'
+
+  ctx += `=== SPENDING PATTERNS ===\n`
+  ctx += `By Tag:            ${Object.entries(tagTotals).map(([k,v]) => `${k} ${c(v)}`).join(' | ')}\n`
+  ctx += `By Payment Method: ${Object.entries(pmTotals).map(([k,v]) => `${k} ${c(v)}`).join(' | ')}\n\n`
+
+  ctx += `=== RECENT TRANSACTIONS (Last 30) ===\n`
+  ctx += `Date   | Category           | Description          | Amount\n`
+  ctx += `${'-'.repeat(70)}\n`
+  ctx += recent.join('\n') + '\n'
+
+  return ctx
+}
+
+export function generateProjectSyncText(transactions, budgets) {
+  const now    = new Date()
+  const SHORT  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+  const today  = `${SHORT[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}`
+  const ctx    = generateFinancialContext(transactions, budgets)
+
+  return `BUDGET TRACKER — FINANCIAL SNAPSHOT
+Synced: ${today}
+${'='.repeat(50)}
+
+Paste this into your Claude Finance Project to give your advisor your latest financial data.
+After pasting, you can ask questions like:
+- "How am I doing overall?"
+- "Where should I cut spending?"
+- "Am I on track for my savings goal?"
+- "Compare my last 3 months"
+
+${'='.repeat(50)}
+
+${ctx}
+
+${'='.repeat(50)}
+End of snapshot — ${today}
+`
 }

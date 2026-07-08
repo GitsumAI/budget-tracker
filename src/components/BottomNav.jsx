@@ -53,6 +53,19 @@ const TABS = [
       </svg>
     ),
   },
+  {
+    id: 'advisor',
+    label: 'Advisor',
+    icon: (active) => (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.5 : 2}
+        strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+        <path d="M12 2a9 9 0 0 1 9 9c0 4.97-4.03 9-9 9a9 9 0 0 1-4.37-1.13L3 21l2.13-4.63A9 9 0 0 1 12 2z"/>
+        <circle cx="9"  cy="11" r="1" fill="currentColor" stroke="none" />
+        <circle cx="12" cy="11" r="1" fill="currentColor" stroke="none" />
+        <circle cx="15" cy="11" r="1" fill="currentColor" stroke="none" />
+      </svg>
+    ),
+  },
 ]
 
 export default function BottomNav() {
